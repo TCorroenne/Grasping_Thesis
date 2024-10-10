@@ -163,3 +163,4 @@ cython_debug/
 
 PEGG-Net/
 test/
+Cornell_dataset/
