@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from utils.grasp_detection import detect_grasps
 import numpy as np
 
-def plot_output_full(rgb_img, depth_img, grasp_q_img, grasp_angle_img,grasp_width_img, no_grasps=1, ):
+def plot_output_full(rgb_img, depth_img, grasp_q_img, grasp_angle_img, grasp_width_img, no_grasps=1):
     """
     Plot the output of a GG-CNN
     Args:
@@ -45,6 +45,6 @@ def plot_output_full(rgb_img, depth_img, grasp_q_img, grasp_angle_img,grasp_widt
     plot = ax.imshow(grasp_width_img, cmap='jet', vmin=0, vmax=155)
     ax.set_title('Width')
     ax.axis('off')
-    
     plt.colorbar(plot)
+    
     plt.show()
