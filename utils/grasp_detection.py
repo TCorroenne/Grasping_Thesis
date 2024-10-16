@@ -1,7 +1,7 @@
 from skimage.feature import peak_local_max
-from PEGG_Net.utils.dataset_processing.grasp import Grasp
+from utils.grasp import Grasp
 
-def detect_grasps(q_img, ang_img, width_img=None, no_grasps=1, mask=None):
+def detect_grasps(q_img, ang_img, width_img=None, no_grasps=1, mask=None,threshold=0.2):
     """
     Detect grasps in a GG-CNN output.
     :param q_img: Q image network output
@@ -10,7 +10,7 @@ def detect_grasps(q_img, ang_img, width_img=None, no_grasps=1, mask=None):
     :param no_grasps: Max number of grasps to return
     :return: list of Grasps
     """
-    local_max = peak_local_max(q_img, min_distance=20, threshold_abs=0.2, num_peaks=no_grasps)
+    local_max = peak_local_max(q_img, min_distance=20, threshold_abs=threshold, num_peaks=no_grasps)
 
     grasps = []
     for grasp_point_array in local_max:

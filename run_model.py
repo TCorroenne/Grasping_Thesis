@@ -1,13 +1,12 @@
+import numpy as np
 import argparse
 import torch
 import cv2
-import numpy as np
-# import files from PEGG-Net folder:
-import PEGG_Net.models.peggnet as peggnet
 # import custom files:
 import utils.image_processing as ip
 import utils.io_processing as iop
 import utils.visualization as vis
+import utils.peggnet_model as peggnet
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Run a pretrained model on a RGBD or D picture')
@@ -56,7 +55,10 @@ def main():
     else:
         print('Loading model from state dict {}'.format(args.state_dict))
         net = peggnet.PEGG_NET(input_channels=input_channels)
-        net.load_state_dict(torch.load(args.state_dict, map_location=device))
+        try:
+            net.load_state_dict(torch.load(args.state_dict,weights_only=True, map_location=device))
+        except:
+            net.load_state_dict(torch.load(args.state_dict, map_location=device))
     assert net is not None, 'Model not loaded'
     print('Model loaded')
     # Run the model
@@ -65,7 +67,8 @@ def main():
         input_img = input_img.to(device)
         pos_output, cos_output, sin_output, width_output = net(input_img)
         q_img, ang_img, width_img = iop.process_raw_output(pos_output, cos_output, sin_output, width_output)
-        vis.plot_output_full(rgb, depth, q_img, ang_img, width_img,5)
+        if args.vis:
+            vis.plot_output_full(rgb, depth, q_img, ang_img, width_img,5)
 
 if __name__ == '__main__':
     main()
