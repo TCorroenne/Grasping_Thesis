@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from skimage.filters import gaussian
 
 def extract_mask_from_img(img, threshold = 127, lower_than_threshold = True):
     """

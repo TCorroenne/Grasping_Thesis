@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from skimage.filters import gaussian
 import torch
 
 
@@ -95,9 +94,9 @@ def process_raw_output(pos_output, cos_output, sin_output, width_output, depth_n
     q_img = pos_output.cpu().numpy().squeeze()
     if depth_nan is not None:
         q_img[depth_nan] = 0
-    q_img = gaussian(q_img, 2.0, preserve_range=True)
+    q_img = cv2.GaussianBlur(q_img, (0,0), 2.0)
     ang_img = (torch.atan2(sin_output, cos_output) / 2.0).cpu().numpy().squeeze()
-    ang_img = gaussian(ang_img, 2.0, preserve_range=True)
+    ang_img = cv2.GaussianBlur(ang_img, (0,0), 2.0)
     width_img = width_output.cpu().numpy().squeeze() * width_factor
-    width_img = gaussian(width_img, 1.0, preserve_range=True)
+    width_img = cv2.GaussianBlur(width_img, (0,0), 1.0)
     return q_img, ang_img, width_img

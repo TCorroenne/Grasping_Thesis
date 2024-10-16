@@ -12,7 +12,7 @@ def plot_output_full(rgb_img, depth_img, grasp_q_img, grasp_angle_img, grasp_wid
         grasp_angle_img: np.array: The grasp angle image.
         no_grasps: int: The number of grasps to plot.
     """
-    gs = detect_grasps(grasp_q_img, grasp_angle_img, width_img=grasp_width_img, no_grasps=no_grasps)
+    gs = detect_grasps(grasp_q_img, grasp_angle_img, width_img=grasp_width_img, no_grasps=no_grasps, threshold=0.4)
 
     fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(2, 3, 1)
