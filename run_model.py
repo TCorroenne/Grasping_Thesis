@@ -7,7 +7,8 @@ import utils.image_processing as ip
 import utils.io_processing as iop
 import utils.visualization as vis
 import utils.peggnet_model as peggnet
-
+import utils.saving as saving
+import utils.grasp_detection as grasp_detection
 def parse_args():
     parser = argparse.ArgumentParser(description='Run a pretrained model on a RGBD or D picture')
     parser.add_argument('--model', type=str, required=False, help='Path to the model file')
@@ -18,7 +19,10 @@ def parse_args():
     parser.add_argument('--use-rgb', action='store_true',default=False ,help='Use RGB image as input')
     parser.add_argument('--use-depth', action='store_true',default=True , help='Use depth image as input')
     parser.add_argument('--vis', action='store_true',default=False , help='Visualize the output')
-
+    parser.add_argument('--save', action='store_true',default=False , help='Save the output')
+    parser.add_argument('--output-dir', type=str, required=False, help='Directory to save the output')
+    parser.add_argument('--save-cornell', action='store_true',default=False , help='Save the output in Cornell format')
+    parser.add_argument('--cornell-save-dir', type=str, required=False, help='Directory to save the Cornell output')
     return parser.parse_args()
 
 def main():
@@ -69,7 +73,15 @@ def main():
         q_img, ang_img, width_img = iop.process_raw_output(pos_output, cos_output, sin_output, width_output)
         if args.vis:
             vis.plot_output_full(rgb, depth, q_img, ang_img, width_img,5)
-
+        if args.save:
+            assert args.output_dir is not None, 'Output save directory not specified'
+            saving.save_results(rgb, q_img, ang_img, depth_img=depth, no_grasps=5, grasp_width_img=width_img, save_dir=args.output_dir)
+        if args.save_cornell:
+            assert args.cornell_save_dir is not None, 'Cornell save directory not specified'
+            list_grasps_q = grasp_detection.detect_grasp_with_quality(q_img, ang_img, width_img=width_img, no_grasps=5)
+            grasp = list_grasps_q[0][0]
+            saving.save_results_cornell(grasp, rgb, depth, save_dir=args.cornell_save_dir)
+            
 if __name__ == '__main__':
     main()
 
