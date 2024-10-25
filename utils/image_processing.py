@@ -1,5 +1,48 @@
 import cv2
 import numpy as np
+import enum
+from dataclasses import dataclass
+
+class DistortionModel(enum.Enum):
+    PINHOLE = 0  # no distortion
+    OPENCV = 1  # opencv calibration (distortion coefficients (k1,k2,p1,p2[,k3[,k4,k5,k6[,s1,s2,s3,s4[,τx,τy]]]]) of 4, 5, 8, 12 or 14 elements.
+
+@dataclass(frozen=True)
+class CameraIntrinsics:
+    """
+    CameraIntrinsics is a container for camera intrinsic parameters.
+
+    Camera intrinsics matrix K = [fx  s cx]
+                                 [ 0 fy cy]
+                                 [ 0  0  1] parameterized by:
+     - fx: focal length in x-direction
+     - fy: focal length in y-direction
+     - cx: principal point in x-direction
+     - cy: principal point in y-direction
+     - s: skew factor (very unusual)
+
+    width and height are the resolution of the camera image.
+    distortion_model is the model of the distortion.
+    distortion_coeffs are the coefficients of the distortion model (none for PINHOLE)
+    """
+
+    fx: float
+    fy: float
+    cx: float
+    cy: float
+    width: int
+    height: int
+    distortion_model: DistortionModel = DistortionModel.PINHOLE
+    distortion_coefficients: np.ndarray = np.array([])
+    s: float = 0.0
+
+    @property
+    def intrinsics_matrix(self):
+        return np.array([[self.fx, self.s, self.cx], [0, self.fy, self.cy], [0, 0, 1]])
+
+    def __repr__(self) -> str:
+        return f"CameraIntrinsics(fx={self.fx}, fy={self.fy}, cx={self.cx}, cy={self.cy}, width={self.width}, height={self.height}, distortion_model={self.distortion_model}, distortion_coefficients={self.distortion_coefficients}, s={self.s})"
+
 
 def extract_mask_from_img(img, threshold = 127, lower_than_threshold = True):
     """
@@ -51,13 +94,13 @@ def get_center_of_mass(mask):
         cX, cY = 0, 0
     return cX, cY
 
-def crop(img, cX, cY, crop_sizeX, crop_sizeY=None):
+def crop(img, centerX, centerY, crop_sizeX, crop_sizeY=None):
     """
     Crop an image around a center point.
     Args:
         img: np.array: The image to crop.
-        cX: int: The x coordinate of the center, or the column in matrix notation. 
-        cY: int: The y coordinate of the center, or the line in in matrix notation.
+        centerX: int: The x coordinate of the center, or the column in matrix notation. 
+        cernterY: int: The y coordinate of the center, or the line in in matrix notation.
         crop_sizeX: int: The size of the crop on the X axis (the column indexin matrix notations), or on both sides if crop_sizeY is None.
         crop_sizeY: int: The size of the crop. If None, crop_sizeY will be equal to crop_sizeX.
     Returns:
@@ -66,8 +109,8 @@ def crop(img, cX, cY, crop_sizeX, crop_sizeY=None):
     if crop_sizeY==None:
         crop_sizeY = crop_sizeX
     shape = img.shape
-    left = max(0, min(cX - crop_sizeX//2, shape[1] - crop_sizeX))
-    top = max(0, min(cY - crop_sizeY//2, shape[0] - crop_sizeY))
+    left = max(0, min(centerX - crop_sizeX//2, shape[1] - crop_sizeX))
+    top = max(0, min(centerY - crop_sizeY//2, shape[0] - crop_sizeY))
     bottom = min(shape[0], top + crop_sizeY)
     right = min(shape[1], left + crop_sizeX)
     return img[top:bottom, left:right]
