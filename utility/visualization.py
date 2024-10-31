@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from utils.grasp_detection import detect_grasps
+from utility.grasp_detection import detect_grasps
 import numpy as np
 
 def plot_output_full(rgb_img, depth_img, grasp_q_img, grasp_angle_img, grasp_width_img, no_grasps=1):
@@ -14,7 +14,7 @@ def plot_output_full(rgb_img, depth_img, grasp_q_img, grasp_angle_img, grasp_wid
     """
     gs = detect_grasps(grasp_q_img, grasp_angle_img, width_img=grasp_width_img, no_grasps=no_grasps, threshold=0.4)
 
-    fig = plt.figure(figsize=(10, 10))
+    fig = plt.figure(figsize=(15, 10))
     ax = fig.add_subplot(2, 3, 1)
     ax.imshow(rgb_img)
     for g in gs:

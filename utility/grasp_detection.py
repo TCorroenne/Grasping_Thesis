@@ -1,5 +1,5 @@
 from skimage.feature import peak_local_max
-from utils.grasp import Grasp
+from utility.grasp import Grasp
 
 def detect_grasps(q_img, ang_img, width_img=None, no_grasps=1, mask=None,threshold=0.2):
     """

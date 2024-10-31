@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from utils.grasp_detection import detect_grasps
-from utils.grasp import Grasp, GraspRectangle
+from utility.grasp_detection import detect_grasps
+from utility.grasp import Grasp, GraspRectangle
 import cv2
 
 def save_results(rgb_img, grasp_q_img, grasp_angle_img, depth_img=None, no_grasps=1, grasp_width_img=None, save_dir='results', name = 'grasp'):
