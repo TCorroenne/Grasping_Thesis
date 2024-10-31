@@ -3,12 +3,12 @@ import argparse
 import torch
 import cv2
 # import custom files:
-import utils.image_processing as ip
-import utils.io_processing as iop
-import utils.visualization as vis
-import utils.peggnet_model as peggnet
-import utils.saving as saving
-import utils.grasp_detection as grasp_detection
+import utility.image_processing as ip
+import utility.io_processing as iop
+import utility.visualization as vis
+import utility.peggnet_model as peggnet
+import utility.saving as saving
+import utility.grasp_detection as grasp_detection
 def parse_args():
     parser = argparse.ArgumentParser(description='Run a pretrained model on a RGBD or D picture')
     parser.add_argument('--model', type=str, required=False, help='Path to the model file')
