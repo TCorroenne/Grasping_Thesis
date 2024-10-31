@@ -1,5 +1,194 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from skimage.draw import polygon
+
+
+def _gr_text_to_no(l, offset=(0, 0)):
+    """
+    Transform a single point from a Cornell file line to a pair of ints.
+    :param l: Line from Cornell grasp file (str)
+    :param offset: Offset to apply to point positions
+    :return: Point [y, x]
+    """
+    x, y = l.split()
+    return [int(round(float(y))) - offset[0], int(round(float(x))) - offset[1]]
+
+
+class GraspRectangles:
+    """
+    Convenience class for loading and operating on sets of Grasp Rectangles.
+    """
+    def __init__(self, grs=None):
+        if grs:
+            self.grs = grs
+        else:
+            self.grs = []
+
+    def __getitem__(self, item):
+        return self.grs[item]
+
+    def __iter__(self):
+        return self.grs.__iter__()
+
+    def __getattr__(self, attr):
+        """
+        Test if GraspRectangle has the desired attr as a function and call it.
+        """
+        # Fuck yeah python.
+        if hasattr(GraspRectangle, attr) and callable(getattr(GraspRectangle, attr)):
+            return lambda *args, **kwargs: list(map(lambda gr: getattr(gr, attr)(*args, **kwargs), self.grs))
+        else:
+            raise AttributeError("Couldn't find function %s in BoundingBoxes or BoundingBox" % attr)
+
+    @classmethod
+    def load_from_array(cls, arr):
+        """
+        Load grasp rectangles from numpy array.
+        :param arr: Nx4x2 array, where each 4x2 array is the 4 corner pixels of a grasp rectangle.
+        :return: GraspRectangles()
+        """
+        grs = []
+        for i in range(arr.shape[0]):
+            grp = arr[i, :, :].squeeze()
+            if grp.max() == 0:
+                break
+            else:
+                grs.append(GraspRectangle(grp))
+        return cls(grs)
+
+    @classmethod
+    def load_from_cornell_file(cls, fname):
+        """
+        Load grasp rectangles from a Cornell dataset grasp file.
+        :param fname: Path to text file.
+        :return: GraspRectangles()
+        """
+        grs = []
+        with open(fname) as f:
+            while True:
+                # Load 4 lines at a time, corners of bounding box.
+                p0 = f.readline()
+                if not p0:
+                    break  # EOF
+                p1, p2, p3 = f.readline(), f.readline(), f.readline()
+                try:
+                    gr = np.array([
+                        _gr_text_to_no(p0),
+                        _gr_text_to_no(p1),
+                        _gr_text_to_no(p2),
+                        _gr_text_to_no(p3)
+                    ])
+
+                    grs.append(GraspRectangle(gr))
+
+                except ValueError:
+                    # Some files contain weird values.
+                    continue
+        return cls(grs)
+
+    @classmethod
+    def load_from_jacquard_file(cls, fname, scale=1.0):
+        """
+        Load grasp rectangles from a Jacquard dataset file.
+        :param fname: Path to file.
+        :param scale: Scale to apply (e.g. if resizing images)
+        :return: GraspRectangles()
+        """
+        grs = []
+        with open(fname) as f:
+            for l in f:
+                x, y, theta, w, h = [float(v) for v in l[:-1].split(';')]
+                # index based on row, column (y,x), and the Jacquard dataset's angles are flipped around an axis.
+                grs.append(Grasp(np.array([y, x]), -theta/180.0*np.pi, w, h).as_gr)
+        grs = cls(grs)
+        grs.scale(scale)
+        return grs
+
+    def append(self, gr):
+        """
+        Add a grasp rectangle to this GraspRectangles object
+        :param gr: GraspRectangle
+        """
+        self.grs.append(gr)
+
+    def copy(self):
+        """
+        :return: A deep copy of this object and all of its GraspRectangles.
+        """
+        new_grs = GraspRectangles()
+        for gr in self.grs:
+            new_grs.append(gr.copy())
+        return new_grs
+
+    def show(self, ax=None, shape=None):
+        """
+        Draw all GraspRectangles on a matplotlib plot.
+        :param ax: (optional) existing axis
+        :param shape: (optional) Plot shape if no existing axis
+        """
+        if ax is None:
+            f = plt.figure()
+            ax = f.add_subplot(1, 1, 1)
+            ax.imshow(np.zeros(shape))
+            ax.axis([0, shape[1], shape[0], 0])
+            self.plot(ax)
+            plt.show()
+        else:
+            self.plot(ax)
+
+    def draw(self, shape, position=True, angle=True, width=True):
+        """
+        Plot all GraspRectangles as solid rectangles in a numpy array, e.g. as network training data.
+        :param shape: output shape
+        :param position: If True, Q output will be produced
+        :param angle: If True, Angle output will be produced
+        :param width: If True, Width output will be produced
+        :return: Q, Angle, Width outputs (or None)
+        """
+        if position:
+            pos_out = np.zeros(shape)
+        else:
+            pos_out = None
+        if angle:
+            ang_out = np.zeros(shape)
+        else:
+            ang_out = None
+        if width:
+            width_out = np.zeros(shape)
+        else:
+            width_out = None
+
+        for gr in self.grs:
+            rr, cc = gr.compact_polygon_coords(shape)
+            if position:
+                pos_out[rr, cc] = 1.0
+            if angle:
+                ang_out[rr, cc] = gr.angle
+            if width:
+                width_out[rr, cc] = gr.length
+
+        return pos_out, ang_out, width_out
+
+    def to_array(self, pad_to=0):
+        """
+        Convert all GraspRectangles to a single array.
+        :param pad_to: Length to 0-pad the array along the first dimension
+        :return: Nx4x2 numpy array
+        """
+        a = np.stack([gr.points for gr in self.grs])
+        if pad_to:
+           if pad_to > len(self.grs):
+               a = np.concatenate((a, np.zeros((pad_to - len(self.grs), 4, 2))))
+        return a.astype(int)
+
+    @property
+    def center(self):
+        """
+        Compute mean center of all GraspRectangles
+        :return: float, mean centre of all GraspRectangles
+        """
+        points = [gr.points for gr in self.grs]
+        return np.mean(np.vstack(points), axis=0).astype(int)
 
 class GraspRectangle:
     """
@@ -32,7 +221,7 @@ class GraspRectangle:
         """
         :return: Rectangle center point
         """
-        return self.points.mean(axis=0).astype(np.int)
+        return self.points.mean(axis=0).astype(int)
 
     @property
     def length(self):
@@ -120,7 +309,7 @@ class GraspRectangle:
             ]
         )
         c = np.array(center).reshape((1, 2))
-        self.points = ((np.dot(R, (self.points - c).T)).T + c).astype(np.int)
+        self.points = ((np.dot(R, (self.points - c).T)).T + c).astype(int)
 
     def scale(self, factor):
         """
@@ -152,7 +341,7 @@ class GraspRectangle:
             ]
         )
         c = np.array(center).reshape((1, 2))
-        self.points = ((np.dot(T, (self.points - c).T)).T + c).astype(np.int)
+        self.points = ((np.dot(T, (self.points - c).T)).T + c).astype(int)
 
 
 class Grasp:
