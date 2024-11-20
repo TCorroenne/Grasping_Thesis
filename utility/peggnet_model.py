@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import sys
+from utility.image_processing import extract_mask_threshold_torch, largest_region_with_scipy
 
 class Mish(torch.nn.Module):
     def __init__(self):
@@ -220,4 +221,50 @@ class PEGG_NET(nn.Module):
             }
         }
 
+    def compute_loss_sparse(self, xc, yc, angle_at_fault: bool = False, score_min_mask: float = 0.3, score: int = 9):
+        y_pos, y_cos, y_sin, y_width = yc
+        score_to_float = [0.0, 0.0, 0.1, 0.2, 0.3, 0.5, 0.6, 0.75, 0.9, 1]
+        y_pos = y_pos * score_to_float[score]
+        # xc is a (1, 4, 480, 480) numpy array, we want to extract a (3, 480, 480) numpy array leaving out the first (depth) channel
+        img = xc.squeeze()[1:4, :, :]
+        
+        mask = extract_mask_threshold_torch(img, -0.2)
+        # We need to find the biggest region in the mask : it's the object
+        region_mask = largest_region_with_scipy(mask)
+        region_without_rect = region_mask
+        region_without_rect = region_without_rect - ((y_pos.squeeze()!=0) * region_without_rect)
+        
+        pos_pred, cos_pred, sin_pred, width_pred = self(xc)
+        pos_mask = pos_pred * region_mask
+        pos_mask[region_mask] =  pos_mask[region_mask].clamp(min=score_min_mask)
+        # pos_mask hold the pos_pred values in the region of the object and so that the values are above score_min_mask
+        if not angle_at_fault:
+            y_pos += region_without_rect * pos_mask
+            y_cos += region_without_rect * cos_pred
+            y_sin += region_without_rect * sin_pred
+        else:
+            y_pos += pos_mask
+            y_cos += region_mask * cos_pred
+            y_sin += region_mask * sin_pred
+        y_width += region_without_rect * width_pred
+        
+        p_loss = F.smooth_l1_loss(pos_pred, y_pos)
+        cos_loss = F.smooth_l1_loss(cos_pred, y_cos)
+        sin_loss = F.smooth_l1_loss(sin_pred, y_sin)
+        width_loss = F.smooth_l1_loss(width_pred, y_width)
 
+        return {
+            'loss': p_loss + cos_loss + sin_loss + width_loss,
+            'losses': {
+                'p_loss': p_loss,
+                'cos_loss': cos_loss,
+                'sin_loss': sin_loss,
+                'width_loss': width_loss
+            },
+            'pred': {
+                'pos': pos_pred,
+                'cos': cos_pred,
+                'sin': sin_pred,
+                'width': width_pred
+            }
+        }
