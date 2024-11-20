@@ -37,8 +37,11 @@ def main():
         input_channels = 1
     print('Input channels: {}'.format(input_channels))
     # Load the images
-    rgb = cv2.imread(args.rgb, cv2.IMREAD_UNCHANGED)
+    rgb = cv2.imread(args.rgb, cv2.IMREAD_COLOR)
+    rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
     depth = cv2.imread(args.depth, cv2.IMREAD_UNCHANGED)
+    depth /= 1000.0
+    print("max and min depth values:",depth.max(),depth.min())
     assert rgb is not None, 'RGB image not loaded'
     assert depth is not None, 'Depth image not loaded'
     print('Images loaded')
@@ -70,6 +73,7 @@ def main():
     with torch.no_grad():
         input_img = input_img.to(device)
         pos_output, cos_output, sin_output, width_output = net(input_img)
+        print('output shape:', pos_output.shape, cos_output.shape, sin_output.shape, width_output.shape)
         q_img, ang_img, width_img = iop.process_raw_output(pos_output, cos_output, sin_output, width_output)
         if args.vis:
             vis.plot_output_full(rgb, depth, q_img, ang_img, width_img,5)
