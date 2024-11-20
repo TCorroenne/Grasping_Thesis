@@ -166,3 +166,4 @@ test/
 Cornell_dataset/
 tensorboard/
 output/
+dataset_generation/
