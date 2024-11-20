@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import enum
 from dataclasses import dataclass
+import torch
+from scipy.ndimage import label
 
 class DistortionModel(enum.Enum):
     PINHOLE = 0  # no distortion
@@ -44,23 +46,59 @@ class CameraIntrinsics:
         return f"CameraIntrinsics(fx={self.fx}, fy={self.fy}, cx={self.cx}, cy={self.cy}, width={self.width}, height={self.height}, distortion_model={self.distortion_model}, distortion_coefficients={self.distortion_coefficients}, s={self.s})"
 
 
-def extract_mask_from_img(img, threshold = 127, lower_than_threshold = True):
+def extract_mask_threshold(
+    image: np.ndarray, threshold: float, lower_than_threshold: bool = True
+) -> np.ndarray:
     """
-    Extracts a mask from an image based on a threshold, in grayscale.
-    Args:
-        img: np.array: The image to extract the mask from.
-        threshold: int: The threshold to use.
-        lower_than_threshold: bool: If True, the mask will be True where the image is lower than the threshold.
+    Extract a mask from the image using a threshold.
     """
-    if img.ndim == 3:
-        im_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    if image.ndim == 3:
+        im_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     else:
-        im_gray = img
+        im_gray = image
     if lower_than_threshold:
-        _, mask = cv2.threshold(im_gray, threshold, 255, cv2.THRESH_BINARY_INV)
+        mask = im_gray < threshold
     else:
-        _, mask = cv2.threshold(im_gray, threshold, 255, cv2.THRESH_BINARY)
+        mask = im_gray > threshold
     return mask
+
+def extract_mask_threshold_torch(
+    tensor: torch.Tensor, threshold: float, lower_than_threshold: bool = True
+) -> np.ndarray:
+    """
+    Extract a mask from the tensor using a threshold.
+    """
+    if tensor.ndimension() == 3:
+        im_gray = tensor.mean(dim=0)
+    else:
+        im_gray = tensor
+    if lower_than_threshold:
+        mask = im_gray < threshold
+    else:
+        mask = im_gray > threshold
+    return mask
+
+def largest_region_with_scipy(tensor: torch.Tensor) -> torch.Tensor:
+    # Convert to numpy
+    np_tensor = tensor.cpu().numpy()
+
+    # Label the regions (4-connectivity by default)
+    labeled_array, num_features = label(np_tensor)
+
+    # Find the largest region label
+    max_region_size = 0
+    largest_region_label = 0
+    for region_label in range(1, num_features + 1):  # Start from 1 because 0 is the background
+        region_size = (labeled_array == region_label).sum()
+        if region_size > max_region_size:
+            max_region_size = region_size
+            largest_region_label = region_label
+
+    # Create a mask for the largest region
+    largest_region_mask = (labeled_array == largest_region_label)
+
+    # Convert back to torch tensor
+    return torch.from_numpy(largest_region_mask).to(tensor.device)
 
 def extend_mask(mask, extend_by=51, shape_square=False):
     """
@@ -75,6 +113,7 @@ def extend_mask(mask, extend_by=51, shape_square=False):
     if extend_by%2 == 0:
         extend_by += 1
     element = cv2.getStructuringElement(shape_cv2, (extend_by, extend_by))
+    mask = mask.astype(np.uint8)
     mask_extended = cv2.dilate(mask, element)
     return mask_extended
 
@@ -139,7 +178,7 @@ def process_rgbd_perfect_table(rgb_img, depth_img, mask=None, output_size=480, t
     depth_img = depth_img.astype(np.float32)
     if mask is None:
         #! THRESHOLD VALUES MIGHT NEED TO BE CHANGED
-        mask = extract_mask_from_img(rgb_img, threshold=1, lower_than_threshold=False)
+        mask = extract_mask_threshold(rgb_img, threshold=1, lower_than_threshold=False)
         mask = extend_mask(mask, extend_by=101, shape_square=False)
     depth_img = cv2.bitwise_or(depth_img, depth_img, mask=mask)
 
@@ -150,7 +189,7 @@ def process_rgbd_perfect_table(rgb_img, depth_img, mask=None, output_size=480, t
     mask_crop = crop(mask, cX, cY, output_size)
     if threshold_object_table is not None:
         threshold_object_table = int(threshold_object_table)
-        mask_table = extract_mask_from_img(depth_crop_int, threshold=threshold_object_table, lower_than_threshold=False)
+        mask_table = extract_mask_threshold(depth_crop_int, threshold=threshold_object_table, lower_than_threshold=False)
         # print(mask_table.dtype)
         # print(mask_crop.dtype)
         # print(mask_table.shape)
@@ -208,7 +247,7 @@ def process_rgbd_inpaint(rgb_img, depth_img, mask=None, output_size=480, thresho
     depth_img = depth_img.astype(np.float32)
     if mask is None:
         #! THRESHOLD VALUES MIGHT NEED TO BE CHANGED
-        mask = extract_mask_from_img(rgb_img, threshold=1, lower_than_threshold=False)
+        mask = extract_mask_threshold(rgb_img, threshold=1, lower_than_threshold=False)
         mask = extend_mask(mask, extend_by=91, shape_square=False)
     depth_img = cv2.bitwise_or(depth_img, depth_img, mask=mask)
 
