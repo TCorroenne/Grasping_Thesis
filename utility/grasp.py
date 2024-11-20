@@ -332,7 +332,7 @@ class GraspRectangle:
         """
         Zoom grasp rectangle by given factor.
         :param factor: Zoom factor
-        :param center: Zoom zenter (focus point, e.g. image center)
+        :param center: Zoom center (focus point, e.g. image center)
         """
         T = np.array(
             [
@@ -342,7 +342,28 @@ class GraspRectangle:
         )
         c = np.array(center).reshape((1, 2))
         self.points = ((np.dot(T, (self.points - c).T)).T + c).astype(int)
+        
+    def zoom_croping(self, factor, center, size = 480):
+        half_size =  size*factor // 2
+        x_min = center[1] - half_size
+        x_max = center[1] + half_size
+        y_min = center[0] - half_size
+        y_max = center[0] + half_size
+        self.points[:, 0] = (self.points[:, 0] - y_min) * size / (2*half_size)
+        self.points[:, 1] = (self.points[:, 1] - x_min) * size / (2*half_size)
 
+
+    def symmetry(self, symmetry, size = 480):
+        """
+        Apply symmetry to grasp rectangle (1: up-down, 2: left-right, 3: up-down and left-right)
+        GraspRectangle are in [i,j] coordinate system (or y,x) 
+        """
+        if symmetry == 1:
+            self.points[:, 0] = size - self.points[:, 0]
+        elif symmetry == 2:
+            self.points[:, 1] = size - self.points[:, 1]
+        elif symmetry == 3:
+            self.points[:, :] = size - self.points[:, :]
 
 class Grasp:
     """
