@@ -18,7 +18,7 @@ def rgbd_input_processing(rgb_img,depth_img,use_depth=True,use_rgb=True):
     out_size = depth_img.shape[0]
     # Stack
     if use_rgb and not use_depth:
-        input_img = rgb_img.reshape(1, 1, out_size, out_size)
+        input_img = rgb_img.reshape(1, 3, out_size, out_size)
     elif use_depth and not use_rgb:
         input_img = depth_img.reshape(1, 1, out_size, out_size)
     else:
