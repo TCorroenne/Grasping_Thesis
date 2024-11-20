@@ -11,7 +11,7 @@ class GraspDatasetBase(torch.utils.data.Dataset):
     An abstract dataset for training GG-CNNs in a common format.
     """
     def __init__(self, output_size=480, include_depth=True, include_rgb=False, random_rotate=False,  # changed from 300 to 480
-                 random_zoom=False, input_only=False, max_width=150.0):
+                 random_zoom=False, input_only=False, max_width=150.0, random_symmetry=False, random_brightness=False, random_contrast=False):
         """
         :param output_size: Image output size in pixels (square)
         :param include_depth: Whether depth image is included
@@ -27,6 +27,12 @@ class GraspDatasetBase(torch.utils.data.Dataset):
         self.include_depth = include_depth
         self.include_rgb = include_rgb
         self.max_width = max_width
+        
+        self.scores = []
+        self.angles_at_fault = []
+        self.random_symmetry = random_symmetry
+        self.random_brightness = random_brightness
+        self.random_contrast = random_contrast
         
         self.grasp_files = []
 
