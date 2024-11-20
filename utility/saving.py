@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from utility.grasp_detection import detect_grasps
-from utility.grasp import Grasp, GraspRectangle
+from utility.grasp import Grasp, GraspRectangle, GraspRectangles
 import cv2
+import os
+from typing import List
 
 def save_results(rgb_img, grasp_q_img, grasp_angle_img, depth_img=None, no_grasps=1, grasp_width_img=None, save_dir='results', name = 'grasp'):
     """
@@ -86,24 +88,40 @@ def save_results(rgb_img, grasp_q_img, grasp_angle_img, depth_img=None, no_grasp
     fig.canvas.draw()
     plt.close(fig)
     
-def save_results_cornell(attemptedGrasp, rgb_img, depth_img, save_dir='results_cornell', grasp_points_suffix='cpos',subfolder='01', index_str='00'):
+def save_results_cornell(attemptedGrasp, rgb_img, depth_img, save_dir='results_cornell', grasp_points_suffix='cpos',subfolder='01', index_str=''):
     """
     Save the results of a grasp detection in the Cornell dataset format.
     Args:
-        attemptedGrasp: Grasp or GraspRectangle: The attempted grasp.
+        attemptedGrasp: Grasp or GraspRectangle or GraspRectangles: The attempted grasp.
         rgb_img: np.array: The RGB image.
         depth_img: np.array: The depth image.
         save_dir: str: The directory to save the results in.
         grasp_points_suffix: str: The suffix for the grasp points should be cpos or cneg
     """
     if isinstance(attemptedGrasp, Grasp):
-        grasp_rectangle = attemptedGrasp.as_gr
+        grasp_rectangles = GraspRectangles(attemptedGrasp.as_gr)
+    elif isinstance(attemptedGrasp, GraspRectangle):
+        grasp_rectangles = GraspRectangles(attemptedGrasp)
+    elif isinstance(attemptedGrasp, list) and isinstance(attemptedGrasp[0], Grasp):
+        grasp_rectangles = GraspRectangles([grasp.as_gr for grasp in attemptedGrasp])
     else:
-        grasp_rectangle = attemptedGrasp
+        grasp_rectangles = attemptedGrasp
+    if not os.path.exists(save_dir + "/" + subfolder):
+        os.makedirs(save_dir + "/" + subfolder)
+    if index_str == "":
+        for i in range(100):
+            str_i = str(i)
+            if len(str_i) == 1:
+                str_i = "0"+str_i
+            if os.path.exists(save_dir + "/" + subfolder + "/" + "pcd" + subfolder + str_i + "d.tiff"):
+                continue
+            index_str = str_i
+            break
     base_save_dir = save_dir + '/' + subfolder + '/' + 'pcd' + subfolder + index_str
     grasp_points_file = open(base_save_dir + grasp_points_suffix + '.txt', 'a')
-    for point in grasp_rectangle.points:
-        grasp_points_file.write(str(point[1]) + ' ' + str(point[0]) + '\n')
+    for grasp_rect in grasp_rectangles:
+        for point in grasp_rect.points:
+            grasp_points_file.write(str(point[1]) + ' ' + str(point[0]) + '\n')
     grasp_points_file.close()
     # Save the depth image as a tiff
     cv2.imwrite(base_save_dir + 'd.tiff', depth_img)
