@@ -221,33 +221,44 @@ class PEGG_NET(nn.Module):
             }
         }
 
-    def compute_loss_sparse(self, xc, yc, angle_at_fault: bool = False, score_min_mask: float = 0.3, score: int = 9):
+    def compute_loss_sparse(self, xc, yc, angle_at_fault: bool = False, score_min_mask: float = 0.3, score = 9):
         y_pos, y_cos, y_sin, y_width = yc
-        score_to_float = [0.0, 0.0, 0.1, 0.2, 0.3, 0.5, 0.6, 0.75, 0.9, 1]
-        y_pos = y_pos * score_to_float[score]
-        # xc is a (1, 4, 480, 480) numpy array, we want to extract a (3, 480, 480) numpy array leaving out the first (depth) channel
-        img = xc.squeeze()[1:4, :, :]
-        
-        mask = extract_mask_threshold_torch(img, -0.2)
-        # We need to find the biggest region in the mask : it's the object
-        region_mask = largest_region_with_scipy(mask)
-        region_without_rect = region_mask
-        region_without_rect = region_without_rect - ((y_pos.squeeze()!=0) * region_without_rect)
-        
         pos_pred, cos_pred, sin_pred, width_pred = self(xc)
-        pos_mask = pos_pred * region_mask
-        pos_mask[region_mask] =  pos_mask[region_mask].clamp(min=score_min_mask)
-        # pos_mask hold the pos_pred values in the region of the object and so that the values are above score_min_mask
-        if not angle_at_fault:
-            y_pos += region_without_rect * pos_mask
-            y_cos += region_without_rect * cos_pred
-            y_sin += region_without_rect * sin_pred
+        score_to_float = [0.0, 0.0, 0.1, 0.2, 0.3, 0.5, 0.6, 0.75, 0.9, 1]
+        n = 1
+        if isinstance(score, torch.Tensor):
+            n = score.size(0)
+        elif isinstance(score, list):
+            n = len(score)
+        elif isinstance(score, int):
+            n = 1
         else:
-            y_pos += pos_mask
-            y_cos += region_mask * cos_pred
-            y_sin += region_mask * sin_pred
-        y_width += region_without_rect * width_pred
-        
+            raise ValueError("score should be a tensor or a list, not a {}".format(type(score))) 
+        assert y_pos.size(0) == n
+        for i in range(n):
+            y_pos[i, :, :, :] = y_pos[i, :, :, :] * score_to_float[score[i]]
+            # xc is a (batch_size, 4, 480, 480) numpy array, we want to extract a (3, 480, 480) array leaving out the first (depth) channel
+            img = xc[i, 1:4, :, :].squeeze()
+
+            mask = extract_mask_threshold_torch(img, -0.2)
+            # We need to find the biggest region in the mask : it's the object
+            region_mask = largest_region_with_scipy(mask)
+            region_without_rect = region_mask
+            region_without_rect = region_without_rect ^ ((y_pos[i, :, :, :].squeeze()!=0) & region_without_rect)
+
+            pos_mask = pos_pred[i, :, :, :] * region_mask
+            pos_mask[0,region_mask] = pos_mask[0,region_mask].clamp(min=score_min_mask)
+            # pos_mask hold the pos_pred values in the region of the object and so that the values are above score_min_mask
+            if not angle_at_fault[i]:
+                y_pos[i, :, :, :] += region_without_rect * pos_mask
+                y_cos[i, :, :, :] += region_without_rect * cos_pred[i, :, :, :]
+                y_sin[i, :, :, :] += region_without_rect * sin_pred[i, :, :, :]
+            else:
+                y_pos[i, :, :, :] += pos_mask
+                y_cos[i, :, :, :] += region_mask * cos_pred[i, :, :, :]
+                y_sin[i, :, :, :] += region_mask * sin_pred[i, :, :, :]
+            y_width[i, :, :, :] += region_without_rect * width_pred[i, :, :, :]
+
         p_loss = F.smooth_l1_loss(pos_pred, y_pos)
         cos_loss = F.smooth_l1_loss(cos_pred, y_cos)
         sin_loss = F.smooth_l1_loss(sin_pred, y_sin)

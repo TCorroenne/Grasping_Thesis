@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage.draw import polygon
-
+import torch
 
 def _gr_text_to_no(l, offset=(0, 0)):
     """
@@ -65,6 +65,36 @@ class GraspRectangles:
         """
         grs = []
         with open(fname) as f:
+            while True:
+                # Load 4 lines at a time, corners of bounding box.
+                p0 = f.readline()
+                if not p0:
+                    break  # EOF
+                p1, p2, p3 = f.readline(), f.readline(), f.readline()
+                try:
+                    gr = np.array([
+                        _gr_text_to_no(p0),
+                        _gr_text_to_no(p1),
+                        _gr_text_to_no(p2),
+                        _gr_text_to_no(p3)
+                    ])
+
+                    grs.append(GraspRectangle(gr))
+
+                except ValueError:
+                    # Some files contain weird values.
+                    continue
+        return cls(grs)
+
+    @classmethod
+    def load_from_cornell_file_s3(cls, fname, fs):
+        """
+        Load grasp rectangles from a Cornell dataset grasp file.
+        :param fname: Path to text file.
+        :return: GraspRectangles()
+        """
+        grs = []
+        with fs.open(fname) as f:
             while True:
                 # Load 4 lines at a time, corners of bounding box.
                 p0 = f.readline()
@@ -342,8 +372,12 @@ class GraspRectangle:
         )
         c = np.array(center).reshape((1, 2))
         self.points = ((np.dot(T, (self.points - c).T)).T + c).astype(int)
-        
-    def zoom_croping(self, factor, center, size = 480):
+
+    def zoom_croping(self, factor, center, size=480):
+        if factor == 1.0:
+            return
+        if isinstance(center, torch.Tensor):
+            center = center.numpy()
         half_size =  size*factor // 2
         x_min = center[1] - half_size
         x_max = center[1] + half_size

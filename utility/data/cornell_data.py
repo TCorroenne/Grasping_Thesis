@@ -4,6 +4,7 @@ import numpy as np
 import random
 import re
 import cv2
+import s3fs
 from .grasp_data import GraspDatasetBase
 from ..grasp import GraspRectangles
 from ..image import DepthImage, Image
@@ -83,6 +84,7 @@ class CornellDataset(GraspDatasetBase):
             rgb_img.img = rgb_img.img.transpose((2, 0, 1))
             # print("{},{},{},{}".format(rgb_img.max(), rgb_img.min(), np.mean(rgb_img), np.std(rgb_img)))
         return rgb_img.img
+
 
 class CustomDataset(GraspDatasetBase):
     """
