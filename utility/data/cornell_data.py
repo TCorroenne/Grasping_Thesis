@@ -4,7 +4,6 @@ import numpy as np
 import random
 import re
 import cv2
-import s3fs
 from .grasp_data import GraspDatasetBase
 from ..grasp import GraspRectangles
 from ..image import DepthImage, Image

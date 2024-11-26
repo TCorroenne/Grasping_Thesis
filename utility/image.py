@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from imageio import imread
 from skimage.transform import rotate, resize
-import s3fs
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -195,10 +194,6 @@ class DepthImage(Image):
     def from_tiff(cls, fname):
         return cls(imread(fname))
 
-    @classmethod
-    def from_tiff_s3(cls, fname, fs):
-        fs2 = s3fs.S3FileSystem()
-        return cls(imread(fs2.open(fname, 'rb')))
 
     def inpaint(self, missing_value=0):
         """
