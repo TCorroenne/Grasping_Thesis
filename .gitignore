@@ -162,8 +162,10 @@ cython_debug/
 #.idea/
 
 PEGG-Net/
+PEGG_Net/
 test/
 Cornell_dataset/
 tensorboard/
 output/
 dataset_generation/
+training/
