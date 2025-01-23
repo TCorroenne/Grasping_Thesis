@@ -243,6 +243,8 @@ def process_rgbd_inpaint(rgb_img, depth_img, mask=None, output_size=480, thresho
     if depth_img.ndim == 3:
         depth_img = cv2.cvtColor(depth_img, cv2.COLOR_BGR2GRAY)
     depth_nan = np.isnan(depth_img)
+    if depth_img.max() > 50:
+        depth_img = depth_img/1000
     depth_img[depth_nan] = 0 
     depth_img = depth_img.astype(np.float32)
     if mask is None:
